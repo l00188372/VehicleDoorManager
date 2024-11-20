@@ -1,18 +1,35 @@
-name: GitHub Actions Demo
-run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
-on: [push]
+name: Close Issues on Merge
+
+on:
+  pull_request:
+    types:
+      - closed
+
 jobs:
-  Explore-GitHub-Actions:
+  close-issue:
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
-      - name: Check out repository code
-        uses: actions/checkout@v4
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
-      - name: List files in the repository
-        run: |
-          ls ${{ github.workspace }}
-      - run: echo "🍏 This job's status is ${{ job.status }}."
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set up GitHub CLI
+      run: |
+        sudo apt-get install -y gh
+
+    - name: Extract Issue Number
+      id: extract_issue
+      run: |
+        issue_numbers=$(echo "${{ github.event.pull_request.body }}" | grep -oE "#[0-9]+" | sed 's/#//g')
+        echo "issue_numbers=${issue_numbers}" >> $GITHUB_ENV
+
+    - name: Close Issues
+      if: env.issue_numbers
+      run: |
+        for issue in ${{ env.issue_numbers }}; do
+          gh issue close "$issue" --repo $GITHUB_REPOSITORY -R $GITHUB_SERVER_URL
+          echo "Closed issue #$issue"
+        done
+      env:
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
